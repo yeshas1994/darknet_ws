@@ -80,13 +80,18 @@ void initializeKalmanFilter() {
 
 
     //    Mat state(state_size, 1, type); // [x, y, v_x, v_y, w, h] state matrix
-
+    //    Mat meas(meas_size, 1, type); // [z_x, z_y, z_w, z_h] these represent the matrix for the measured vals
+    kf.statePost.at<float>(0) = 0;
+    kf.statePost.at<float>(1) = 0;
+    kf.statePost.at<float>(2) = 0;
+    kf.statePost.at<float>(3) = 0;
+    kf.statePost.at<float>(4) = 0;
+    kf.statePost.at<float>(5) = 0;
     // Measure Matrix H
     // [1 0 0 0 0 0]
     // [0 1 0 0 0 0]
     // [0 0 0 0 1 0]
     // [0 0 0 0 0 1]
-    //    Mat meas(meas_size, 1, type); // [z_x, z_y, z_w, z_h] these represent the matrix for the measured vals
 
     kf.measurementMatrix = Mat::zeros(meas_size, state_size, type);
     kf.measurementMatrix.at<float>(0) = 1.0f;
@@ -163,8 +168,23 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
         kf.transitionMatrix.at<float>(9) = dT;
 
         //ROS_INFO_STREAM("dT = " << dT);
+        
+        double x_ =  kf.statePost.at<float>(0);
+        double y_ = kf.statePost.at<float>(1);
+        double dx_ = kf.statePost.at<float>(2);
+        double dy_ = kf.statePost.at<float>(3);
+        double w = kf.statePost.at<float>(4);
+        double h = kf.statePost.at<float>(5);
+    
+        Mat prediction = kf.predict();
 
-        state = kf.predict();
+        kf.statePre.at<float>(0) = x_ + dx_ * dT;
+        kf.statePre.at<float>(1) = y_ + dy_ * dT;
+        kf.statePre.at<float>(2) = dx_;
+        kf.statePre.at<float>(3) = dy_;
+        kf.statePre.at<float>(4) = w; 
+        kf.statePre.at<float>(5) = h;
+
         Rect predRect; //predicted state
         predRect.width = state.at<float>(4);
         predRect.height = state.at<float>(5);
@@ -228,8 +248,15 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 
         } else {
 
-            kf.correct(meas);
-            cout << meas << endl;
+            Mat estimate = kf.correct(meas);
+            kf.temp5.at<float>(0) = meas.at<float>(0) - kf.statePre.at<float>(0);
+            kf.temp5.at<float>(1) = meas.at<float>(1) - kf.statePre.at<float>(1); 
+            kf.temp5.at<float>(2) = meas.at<float>(2) - kf.statePre.at<float>(4); 
+            kf.temp5.at<float>(3) = meas.at<float>(3) - kf.statePre.at<float>(5);
+            kf.statePost = kf.statePre + kf.gain * kf.temp5;
+            cout << "Estimate" << estimate << endl;
+            cout << "statePost" << kf.statePost << endl;
+            cout << "statePre" << kf.statePre << endl;
         }
 
     }
@@ -241,6 +268,7 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
     //pub.publish(target_person);
 
 }
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "people_listener");
     ros::NodeHandle nh;

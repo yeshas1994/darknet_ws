@@ -57,8 +57,8 @@ void viewercallback(const sensor_msgs::ImageConstPtr& msg){
     }
     
     cv::imshow("View", cv_view->image);
+    cv::waitKey(10);    
     cv::cvtColor(cv_view->image, img_hsv, CV_BGR2HSV);
-    
 
     //-- Trackbars to set thresholds for HSV values
     //        cv::inRange(img_hsv, cv::Scalar(0,100,100), cv::Scalar(10,255,255), img_mask1);// lower range for red
@@ -80,7 +80,8 @@ void viewercallback(const sensor_msgs::ImageConstPtr& msg){
      * Maybe a combination of two?
      */
 
-    //cv::imshow("mask", img_maskfinal);
+    cv::imshow("mask", img_maskfinal);
+    cv::waitKey(10);
     cv::Mat canny;
 
     std::vector< std::vector<cv::Point> > contour_op; 
@@ -205,11 +206,11 @@ int main(int argc, char **argv){
     //cv::createTrackbar("High B","Object Detection", &high_b, 255, on_high_b_thresh_trackbar);
 
     cv::namedWindow("View");
-    //    cv::namedWindow("mask");
+    cv::namedWindow("mask");
     //    cv::namedWindow("canny");
     cv::startWindowThread();
     image_transport::ImageTransport it(nh);
-    image_transport::Subscriber sub2 = it.subscribe("/kinect2/qhd/image_color", 1, viewercallback);
+    image_transport::Subscriber sub2 = it.subscribe("usb_cam/image_raw", 1, viewercallback);
     image_transport::Subscriber sub3 = it.subscribe("/kinect2/qhd/image_depth_rect", 1, depthCallback);
     //	ros::Subscriber sub4 = nh.subscribe<PointCloud>("/kinect2/qhd/points", 1, depthCallback);
     ros::spin();

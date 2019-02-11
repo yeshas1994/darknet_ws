@@ -1,0 +1,7 @@
+<launch>
+    <!-- Yolo Kalman and Mean Shift -->
+    <node pkg="detection" type="yolo_kalman" name="yolo_kalman" output="screen" respawn="true">
+    </node>
+
+
+</launch>

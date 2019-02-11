@@ -49,5 +49,8 @@ target_link_libraries(humanDetection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${O
 add_executable(yolo_kalman src/yolo_kalman.cpp)
 target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
 
+add_executable(yolo_ekf src/yolo_ekf.cpp)
+target_link_libraries(yolo_ekf ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+
 add_executable(yolo src/yolo_human_detection.cpp)
 target_link_libraries(yolo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})

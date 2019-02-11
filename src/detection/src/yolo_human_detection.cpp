@@ -133,28 +133,7 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 //imshow("lol", image_color);
 //waitKey(10);
 }
-/*
-   void imageCallback(const sensor_msgs::ImageConstPtr& img) {
-   cv_bridge::CvImagePtr cv_ptr;
 
-   try {
-   cv_ptr = cv_bridge::toCvCopy(img, enc::TYPE_16UC1); //TYPE_16UC1 for depth generally
-   }
-
-   catch (cv_bridge::Exception& e) {
-   ROS_ERROR("cv_bridge exception: %s", e.what());
-   return;
-   }
-
-   Point center;
-
-   center.x = (::xMin + ::xMax)/2;
-   center.y = (::yMin + ::yMax)/2;
-
-   int depth = cv_ptr->image.at<short int>(center);
-   ROS_INFO("Depth: %d", depth);
-   }
-   */
 int main(int argc, char **argv) {
     ros::init(argc, argv, "people_listener");
     ros::NodeHandle nh;
