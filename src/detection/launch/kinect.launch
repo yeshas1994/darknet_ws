@@ -1,0 +1,10 @@
+<launch>
+    <!-- Yolo Kalman and Mean Shift -->
+    
+    <param name="sensor_type" value="kinect" />
+
+    <node pkg="detection" type="yolo_ekf" name="yolo_ekf" output="screen" respawn="true">
+      <remap from="image_color" to="kinect2/qhd/image_color"/>
+      <remap from="image_depth" to="kinect2/qhd/image_depth_rect"/>
+    </node>
+</launch>

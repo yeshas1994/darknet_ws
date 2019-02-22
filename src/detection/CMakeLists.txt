@@ -7,7 +7,7 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(OpenCV 2 REQUIRED)
+find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
@@ -42,15 +42,20 @@ target_link_libraries(tutorial ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_
 
 add_executable(depth src/depth_calc.cpp)
 target_link_libraries(depth ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(depth detection_generate_messages_cpp)
 
 add_executable(humanDetection src/human_detection.cpp)
 target_link_libraries(humanDetection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(humanDetection detection_generate_messages_cpp)
 
 add_executable(yolo_kalman src/yolo_kalman.cpp)
 target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(yolo_kalman detection_generate_messages_cpp)
 
 add_executable(yolo_ekf src/yolo_ekf.cpp)
 target_link_libraries(yolo_ekf ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(depth detection_generate_messages_cpp)
 
 add_executable(yolo src/yolo_human_detection.cpp)
 target_link_libraries(yolo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(depth detection_generate_messages_cpp)

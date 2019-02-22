@@ -1,6 +1,7 @@
 <launch>
     <!-- Yolo Kalman and Mean Shift -->
-    <node pkg="detection" type="yolo_kalman" name="yolo_kalman" output="screen" respawn="true">
+    <node pkg="detection" type="yolo_ekf" name="yolo_ekf" output="screen" respawn="true">
+      <param name="camera_feed" value="/kinect2/qhd/image_color"/>
     </node>
 
 
