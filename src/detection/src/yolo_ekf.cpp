@@ -198,7 +198,7 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
         target_person.x = center.x;
         target_person.y = center.y;
         target_person.image_width = image_color.cols;
-        target_person.depth = depth_image.at<short int>(center);
+      //  target_person.depth = depth_image.at<short int>(center);
         pub.publish(target_person);
     } else {
         for (const darknet_ros_msgs::BoundingBox& boxes : people->bounding_boxes) {
@@ -278,8 +278,8 @@ int main(int argc, char** argv) {
 
     image_transport::ImageTransport it(nh);
     namedWindow("lol");
-    image_transport::Subscriber RGBImage_sub = it.subscribe("/kinect2/qhd/image_color", 1, getCvImage);
-    image_transport::Subscriber depthImage_sub = it.subscribe("/kinect2/qhd/image_depth_rect", 1, getDepthImage);
+    image_transport::Subscriber RGBImage_sub = it.subscribe("/usb_cam/image_raw", 1, getCvImage);
+    //image_transport::Subscriber depthImage_sub = it.subscribe("/kinect2/qhd/image_depth_rect", 1, getDepthImage);
     ros::Subscriber sub = nh.subscribe("/darknet_ros/bounding_boxes", 1, person_location);
     startWindowThread();
     ros::spin();
