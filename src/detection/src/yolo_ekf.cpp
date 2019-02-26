@@ -56,19 +56,30 @@ void getCvImage(const sensor_msgs::ImageConstPtr& img) {
 
 void getZedDepthImage(const sensor_msgs::ImageConstPtr& img) {
   depths = (float*)(&img->data[0]);
+  
   target_person.x = center.x;
   target_person.x_vel = state.at<float>(2);
   target_person.y = center.y;
   target_person.y_vel = state.at<float>(3);
   target_person.image_width = image_color.cols;
-  int center_idx = center.x + (image_color.cols * center.y);
+  int center_idx = center.x + (image_color.cols * center.y); // Zed Depth 
   target_person.depth = depths[center_idx];
+  
   pub.publish(target_person);
 }
 
 
 void getDepthImage(const sensor_msgs::ImageConstPtr& img) {
   depth_image = cv_bridge::toCvCopy(img, enc::TYPE_16UC1)->image; //current depth image
+ 
+  target_person.x = center.x;
+  target_person.x_vel = state.at<float>(2);
+  target_person.y = center.y;
+  target_person.y_vel = state.at<float>(3);
+  target_person.image_width = image_color.cols;
+  target_person.depth = depth_image.at<short int>(center);
+  
+  pub.publish(target_person);
 }
 
 Mat getHistogram(const darknet_ros_msgs::BoundingBox& box, const Mat& img_rgb) {
@@ -352,38 +363,26 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 int main(int argc, char** argv) {
   ros::init(argc, argv, "people_listener");
   ros::NodeHandle nh;
-  ros::NodeHandle nh_private("~");
-  pub = nh.advertise<detection::target_person>("/person", 1);
-
-  nh_private.getParam("sensor_type", sensor_type);
-  cout << sensor_type << endl;
-  initializeKalmanFilter();
-
+  ros::NodeHandle nh_private("~"); 
   image_transport::ImageTransport it(nh);
   namedWindow("Predict");
+  
+  pub = nh.advertise<detection::target_person>("/person", 1);
+  nh_private.getParam("sensor_type", sensor_type);
+  
+  initializeKalmanFilter();
 
-<<<<<<< HEAD
-    image_transport::ImageTransport it(nh);
-    namedWindow("lol");
-    image_transport::Subscriber RGBImage_sub = it.subscribe("/usb_cam/image_raw", 1, getCvImage);
-    //image_transport::Subscriber depthImage_sub = it.subscribe("/kinect2/qhd/image_depth_rect", 1, getDepthImage);
-    ros::Subscriber sub = nh.subscribe("/darknet_ros/bounding_boxes", 1, person_location);
-    startWindowThread();
-    ros::spin();
-=======
-  image_transport::Subscriber RGBImage_sub = it.subscribe("/zed/rgb/image_rect_color", 1, getCvImage);
-
+  image_transport::Subscriber RGBImage_sub = it.subscribe("/image_color", 1, getCvImage);
   ros::Subscriber sub = nh.subscribe("/darknet_ros/bounding_boxes", 100, person_location);
-  image_transport::Subscriber depthImage_sub = it.subscribe("/zed/depth/depth_registered", 1, getZedDepthImage);
+
   if (sensor_type.compare("kinect") == 0) {
-    image_transport::Subscriber depthImage_sub = it.subscribe("/kinect2/qhd/image_depth_rect", 1, getDepthImage);
+    image_transport::Subscriber depthImage_sub = it.subscribe("/image_depth", 1, getDepthImage);
   } else {
     image_transport::Subscriber depthImage_sub = it.subscribe("/image_depth", 1, getZedDepthImage);
   }
 
   startWindowThread();
   ros::spin();
->>>>>>> origin/master
 
   return 0;
 }
