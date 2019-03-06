@@ -14,7 +14,7 @@
 #include "darknet_ros_msgs/BoundingBox.h"
 #include "detection/target_person.h"
 #include "std_msgs/Int64.h"
-#include "detection/TKalmanFilter.h"
+#include "detection/tracks.h"
 
 using namespace std;
 using namespace cv;
@@ -33,7 +33,7 @@ bool has_image = false;
 int no_target_count = 0;
 
 vector<darknet_ros_msgs::BoundingBox> people_list;
-vector<TKalmanFilter> kf_list;
+vector<tracks> tracks_list;
 int target_index;
 // Kalman initialization
 // KalmanFilter kf(6, 4, 0, CV_32F); // initialize the kalman 
@@ -70,10 +70,10 @@ void getCvImage(const sensor_msgs::ImageConstPtr& img) {
 void getZedDepthImage(const sensor_msgs::ImageConstPtr& img) {
   depths = (float*)(&img->data[0]);
 
-  target_person.x = kf_list[target_index].state.at<float>(0);
-  target_person.x_vel = kf_list[target_index].state.at<float>(2);
-  target_person.y = kf_list[target_index].state.at<float>(1);
-  target_person.y_vel = kf_list[target_index].state.at<float>(3);
+  target_person.x = tracks_list[target_index].kf.state.at<float>(0);
+  target_person.x_vel = tracks_list[target_index].kf.state.at<float>(2);
+  target_person.y = tracks_list[target_index].kf.state.at<float>(1);
+  target_person.y_vel = tracks_list[target_index].kf.state.at<float>(3);
   target_person.image_width = image_color.cols;
   int center_idx = center.x + (image_color.cols * center.y); // Zed Depth 
   target_person.depth = depths[center_idx];
@@ -85,10 +85,10 @@ void getZedDepthImage(const sensor_msgs::ImageConstPtr& img) {
 void getDepthImage(const sensor_msgs::ImageConstPtr& img) {
   depth_image = cv_bridge::toCvCopy(img, enc::TYPE_16UC1)->image; //current depth image
 
-  target_person.x = kf_list[target_index].state.at<float>(0);
-  target_person.x_vel = kf_list[target_index].state.at<float>(2);
-  target_person.y = kf_list[target_index].state.at<float>(1);
-  target_person.y_vel = kf_list[target_index].state.at<float>(3);
+  target_person.x = tracks_list[target_index].kf.state.at<float>(0);
+  target_person.x_vel = tracks_list[target_index].kf.state.at<float>(2);
+  target_person.y = tracks_list[target_index].kf.state.at<float>(1);
+  target_person.y_vel = tracks_list[target_index].kf.state.at<float>(3);
   target_person.image_width = image_color.cols;
   target_person.depth = depth_image.at<short int>(center);
 
@@ -120,14 +120,6 @@ Mat getHistogram(const darknet_ros_msgs::BoundingBox& box, const Mat& img_rgb) {
   return roi_hist;
 }
 
-double calc_Distance(Point a, Point b) {
-  return sqrt( pow((a.x - b.x),2) + pow((a.y - b.y),2) );
-}
-
-Point getBboxCenter(const darknet_ros_msgs::BoundingBox& box) {
-  return Point( (box.xmax+box.xmin)/2.0 , (box.ymax+box.ymin)/2.0 ); 
-}
-
 double iouScore(Rect predBox, Rect detectBox) {
 
   double xmin = max(predBox.x, detectBox.x);
@@ -145,6 +137,13 @@ double iouScore(Rect predBox, Rect detectBox) {
   return iou;
 }
 
+double calc_Distance(Point a, Point b) {
+  return sqrt( pow((a.x - b.x),2) + pow((a.y - b.y),2) );
+}
+
+Point getBboxCenter(const darknet_ros_msgs::BoundingBox& box) {
+  return Point( (box.xmax+box.xmin)/2.0 , (box.ymax+box.ymin)/2.0 ); 
+}
 
 void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 
@@ -163,7 +162,6 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
   if (!has_image) {
     return;
   }
-
   if (has_target) {
     vector<darknet_ros_msgs::BoundingBox> box_list;
     vector<darknet_ros_msgs::BoundingBox> people_update_list; 
@@ -172,81 +170,59 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
       return;
     }
 
-    for (int i = 0; i < people->bounding_boxes.size(); i++) {
-      const darknet_ros_msgs::BoundingBox& box = people->bounding_boxes[i];
+    for (const darknet_ros_msgs::BoundingBox& box : people->bounding_boxes) {
       //if (box.probability > 0.5) 
       box_list.push_back(box);
     }
 
-    for (int i = 0; i < kf_list.size(); i++) {
-      kf_list[i].predict(dT);
+      cout << "predict" << endl;
+
+      cout << tracks_list.size() << endl;
+    for (tracks trackz_ : tracks_list) {
+      trackz_.predict(dT);
     }
 
-    vector< vector<double> > HungarianMat(kf_list.size());
-    vector< vector<double> > MShiftMat(kf_list.size()); 
-    vector< vector<double> > iouMat(kf_list.size());
-    cout << "lol" << endl;
-    for (int i = 0; i < kf_list.size(); i++) {
+    vector< vector<double> > HungarianMat(tracks_list.size());
+
+    for (int i = 0; i < tracks_list.size(); i++) {
       HungarianMat[i] = vector<double>(box_list.size());
-      MShiftMat[i] = vector<double>(box_list.size());
-      iouMat[i] = vector <double>(box_list.size());
       for (int j = 0; j < box_list.size(); j++) {
-        
-        HungarianMat[i][j] = calc_Distance( kf_list[i].getCenter(), getBboxCenter(box_list[j]) );
-        Mat boxHist = getHistogram(box_list[j], image_color);
-        double temp_score = compareHist(kf_list[i].histogram, boxHist, CV_COMP_BHATTACHARYYA);
-        MShiftMat[i][j] = temp_score;
-        
-        iouMat[i][j] = iouScore(kf_list[i].getPredictedBox(), create_rect(box_list[j]));
+        HungarianMat[i][j] = calc_Distance( tracks_list[i].getCenter(), getBboxCenter(box_list[j]) );
       }
     }
-  
-    cout << "ok" << endl;
 
-    for (int i = 0; i < kf_list.size(); i++) {
-      //int minElementIndex = min_element(HungarianMat[i].begin(), HungarianMat[i].end()) - 
-        //HungarianMat[i].begin();
-      int minElementIndex = min_element(MShiftMat[i].begin(), MShiftMat[i].end()) - MShiftMat[i].begin();
-      //int minElementIndex = max_element(iouMat[i].begin(), iouMat[i].end()) - iouMat[i].begin();
-  //    double iou = iouScore(kf_list[i].bbox, create_rect(box_list[minElementIndex]));
-//      double score = compareHist(kf_list[i].histogram, getHistogram(box_list[minElementIndex], image_color), CV_COMP_BHATTACHARYYA);
+      cout << "hungary" << endl;
+    people_list.clear();
 
-      // can use score, iou and distance
-//      if (MShiftMat[i][minElementIndex] < 1) {
-        kf_list[i].update(box_list[minElementIndex]);
-        kf_list[i].updateDetection(create_rect(box_list[minElementIndex]));
-        kf_list[i].updateHistogram(getHistogram(box_list[minElementIndex], image_color));
+    for (int i = 0; i < tracks_list.size(); i++) {
+      int minElementIndex = min_element(HungarianMat[i].begin(), HungarianMat[i].end()) - 
+        HungarianMat[i].begin();
+
+      double iou = iouScore(tracks_list[i].bbox, create_rect(box_list[minElementIndex]));
+
+      if (HungarianMat[i][minElementIndex] < 50 && iou > 0.8) {
+        tracks_list[i].update(box_list[minElementIndex]);
+        tracks_list[i].updateDetection(create_rect(box_list[minElementIndex]));
         // people_list.push_back(box_list[minElementIndex]);
-        if (!box_list.empty())
-          box_list.erase(box_list.begin() + minElementIndex);
-  //    } else {
-  //      kf_list[i].noDetection();
-  //    }
+        box_list.erase(box_list.begin() + minElementIndex);
+      } else {
+        tracks_list[i].noDetection();
+      }
     }
 
-    for (int i = 0; i < kf_list.size(); i++) {
-      if (!(kf_list[i].updated()))
-        kf_list[i].noDetection();
-    }
-
-    for (int i = 0; i < kf_list.size(); i++) {
-      if (kf_list[i].invisible_count > 0) {
-        kf_list.erase(kf_list.begin() + i);
+    for (int i = 0; i < tracks_list.size(); i++) {
+      if (tracks_list[i].invisible_count > 20) {
+        tracks_list.erase(tracks_list.begin() + i);
       }
     }
 
     for (const darknet_ros_msgs::BoundingBox& boxes : box_list) {
-      TKalmanFilter kf_(6, 4, kf_list.back().id + 1);
-      kf_.setFixed(6, 4, CV_32F);
-      kf_.init(boxes);
-      kf_.updateDetection(create_rect(boxes));
-      kf_.updateHistogram(getHistogram(boxes, image_color));
-      kf_list.push_back(kf_);
+      tracks tracked_(tracks_list.back().id + 1, create_rect(boxes), 6, 4, CV_32F);
+      tracked_.setFixed(6, 4, CV_32F);
+      tracked_.init(boxes);
+      tracks_list.push_back(tracked_);
     }
-
-//    for (int i =  0; i < kf_list.size(); i++) {
-      rectangle(cv_ptr->image, kf_list[0].bbox, Scalar(51,255,255), 4);
-//    }
+    rectangle(cv_ptr->image, tracks_list[target_index].bbox, Scalar(50 , 100, 100), 4);
 
     imshow("Predict", cv_ptr->image);
     waitKey(5);
@@ -259,6 +235,8 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 
     // ROS_INFO_STREAM("dist = " << maxDist);
     // ROS_INFO_STREAM("best_score = " << best_score);
+
+    // Distance management, create a kalman class to allow for multiple person detection
 
     // Rect target_rect = create_rect(people->bounding_boxes[best_box_i]);
     // double t_score = compareHist(target_roi, 
@@ -285,30 +263,27 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
     double prob = 0.0;
     for (const darknet_ros_msgs::BoundingBox& boxes : people->bounding_boxes) {
       people_list.push_back(boxes);
-      TKalmanFilter kf(6, 4, i);
-      kf.setFixed(6, 4, CV_32F); 
-      kf.init(boxes);
-      kf.updateHistogram(getHistogram(boxes, image_color));
-      kf.updateDetection(create_rect(boxes));
-      kf_list.push_back(kf);
-
-      if (boxes.probability > prob ) {
+      tracks tracked_(i, create_rect(boxes), 6, 4, CV_32F);
+      tracked_.setFixed(6, 4, CV_32F);
+      tracked_.init(boxes);
+      tracks_list.push_back(tracked_);
+      if (boxes.probability > prob) {
         target_box = boxes;
         prob = boxes.probability;
         target_index = i;
       }
       i++;
     }
-
+    //
     //    for (const darknet_ros_msgs::BoundingBox& boxes : people->bounding_boxes) {
     //      TKalmanFilter kf(6,4);
     //      kf.setFixed(6,4,CV_32F); 
-    //      kf_list.push_back(kf);
+    //      tracks_list.push_back(kf);
     //    }
   }
 
   //target_roi = getHistogram(target_box, image_color);
-  //cout << "INITIALIZED" << endl;
+  cout << "INITIALIZED" << endl;
 
   if (people->bounding_boxes.empty()) {
     no_target_count++;
@@ -321,16 +296,18 @@ void person_location(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
     no_target_count = 0;
 
     if (!has_target) { //first detection!     
-      for (int i = 0; i < kf_list.size(); i++) {
+      //int i = 0;
+      //for (const TKalmanFilter tk : tracks_list) {
+      //  tk.init(people_list[i]);
+      //  i++;
       }
-
       has_target = true;
 
-    } else {
-      for (int i = 0; i < kf_list.size(); i++) {
-        //        kf_list[i].update(people_list[i]);
-      }
-    }
+      //    } else {
+      //      for (int i = 0; i < tracks_list.size(); i++) {
+      //        tracks_list[i].update(people_list[i]);
+      //      }
+      //    }
   }
 }
 

@@ -380,7 +380,7 @@ int main(int argc, char** argv) {
 
   initializeKalmanFilter();
 
-  image_transport::Subscriber RGBImage_sub = it.subscribe("/image_color", 1, getCvImage);
+  image_transport::Subscriber RGBImage_sub = it.subscribe("/kinect2/qhd/image_color", 1, getCvImage);
   ros::Subscriber sub = nh.subscribe("/darknet_ros/bounding_boxes", 100, person_location);
 
   if (sensor_type.compare("kinect") == 0) {

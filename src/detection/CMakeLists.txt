@@ -32,7 +32,14 @@ generate_messages(
 )
 
 catkin_package(
-CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
+  INCLUDE_DIRS
+    include
+  CATKIN_DEPENDS 
+    cv_bridge 
+    image_transport 
+    roscpp 
+    sensor_msgs 
+    std_msgs
 )
 
 include_directories( include ${catkin_INCLUDE_DIRS} ) 
@@ -52,10 +59,24 @@ add_executable(yolo_kalman src/yolo_kalman.cpp)
 target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
 add_dependencies(yolo_kalman detection_generate_messages_cpp)
 
-add_executable(yolo_ekf src/yolo_ekf.cpp)
-target_link_libraries(yolo_ekf ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(depth detection_generate_messages_cpp)
+add_executable(yolo_final src/yolo_ekf.cpp)
+target_link_libraries(yolo_final ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(yolo_final detection_generate_messages_cpp)
+
+add_executable(yolo_TKal src/yolo_ekf2.cpp src/TKalmanFilter.cpp include/TKalmanFilter.h)
+target_link_libraries(yolo_TKal ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(yolo_TKal detection_generate_messages_cpp)
+
+add_executable(yolo_iou 
+  src/yolo_ekf3.cpp 
+  src/TKalmanFilter.cpp 
+  src/tracks.cpp
+  include/TKalmanFilter.h
+  include/tracks.h
+)
+target_link_libraries(yolo_iou ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+add_dependencies(yolo_iou detection_generate_messages_cpp)
 
 add_executable(yolo src/yolo_human_detection.cpp)
 target_link_libraries(yolo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(depth detection_generate_messages_cpp)
+add_dependencies(yolo detection_generate_messages_cpp)
