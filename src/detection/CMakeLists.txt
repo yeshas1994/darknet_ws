@@ -3,8 +3,8 @@ project(detection)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
-
 ## Find catkin macros and libraries
+
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(OpenCV REQUIRED)
@@ -32,10 +32,27 @@ generate_messages(
 )
 
 catkin_package(
-CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
+  INCLUDE_DIRS
+    include
+  CATKIN_DEPENDS 
+    cv_bridge 
+    image_transport 
+    roscpp 
+    sensor_msgs 
+    std_msgs
+  LIBRARIES detect_lib
 )
 
 include_directories( include ${catkin_INCLUDE_DIRS} ) 
+
+install(DIRECTORY include/detection/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+  FILES_MATCHING PATTERN "*.h")
+
+add_library(detect_lib
+  src/TKalmanFilter.cpp
+  src/Hungarian.cpp)
+target_link_libraries(detect_lib ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS}) 
 
 add_executable(tutorial src/images_tutorial1.cpp)
 target_link_libraries(tutorial ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
@@ -49,13 +66,36 @@ target_link_libraries(humanDetection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${O
 add_dependencies(humanDetection detection_generate_messages_cpp)
 
 add_executable(yolo_kalman src/yolo_kalman.cpp)
-target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
 add_dependencies(yolo_kalman detection_generate_messages_cpp)
 
-add_executable(yolo_ekf src/yolo_ekf.cpp)
-target_link_libraries(yolo_ekf ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(depth detection_generate_messages_cpp)
+add_executable(yolo_final src/yolo_ekf.cpp)
+target_link_libraries(yolo_final ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
+add_dependencies(yolo_final detection_generate_messages_cpp)
+
+add_executable(yolo_TKal 
+  src/yolo_ekf2.cpp 
+  src/TKalmanFilter.cpp 
+  #include/TKalmanFilter.h
+  #include/Hungarian.h
+)
+target_link_libraries(yolo_TKal ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
+add_dependencies(yolo_TKal detection_generate_messages_cpp)
+
+instalL(TARGETS detect_lib
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION} 
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+
+#add_executable(yolo_iou 
+#  src/yolo_ekf3.cpp 
+#  src/TKalmanFilter.cpp 
+#  src/tracks.cpp
+#  include/detection/TKalmanFilter.h
+#)
+#target_link_libraries(yolo_iou ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
+#add_dependencies(yolo_iou detection_generate_messages_cpp)
 
 add_executable(yolo src/yolo_human_detection.cpp)
 target_link_libraries(yolo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(depth detection_generate_messages_cpp)
+add_dependencies(yolo detection_generate_messages_cpp)

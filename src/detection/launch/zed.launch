@@ -3,7 +3,7 @@
 
     <param name="sensor_type" type="string" value="zed" />
 
-    <node pkg="detection" type="yolo_ekf" name="yolo_ekf" output="screen" respawn="true">
+    <node pkg="detection" type="yolo_TKal" name="yolo_TKal" output="screen" respawn="true">
       <remap from="/image_color" to="/zed/rgb/image_rect_color"/>
       <remap from="/image_depth" to="/zed/depth/depth_registered"/>
     </node>
