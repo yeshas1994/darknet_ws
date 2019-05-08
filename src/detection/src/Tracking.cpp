@@ -24,31 +24,33 @@ using namespace Eigen;
 namespace enc = sensor_msgs::image_encodings;
 
 class tracker {
-public:
-  tracker();
+  public:
+    tracker();
 
-private:
-  double max_invis_count;
+  private:
+    double max_invis_count;
 
-  ros::Subscriber camera_sub;
-  ros::Subscriber depth_sub;
-  ros::Subscriber darknet_sub;
+    ros::Subscriber camera_sub;
+    ros::Subscriber depth_sub;
+    ros::Subscriber darknet_sub;
 
-  ros::Publisher person_pub;
-  
-  darknet_ros_msgs::BoundingBox target_box;
-  detection::target_person target_person;
-  HungarianAlgorithm hungarian_algorithm;
-  cv_bridge::CvImagePtr cv_ptr;
-  vector<ExtKalmanFilter> ekf_list;
-  float* depths;
-  bool has_image= false;
-  bool initial_ = true;
+    ros::Publisher person_pub;
 
-  void cameraCallback(const sensor_msgs::ImageConstPtr &img);
-  void depthCallback(const sensor_msgs::ImageConstPtr &depth_img);
-  void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people);
+    darknet_ros_msgs::BoundingBox target_box;
+    detection::target_person target_person;
+    HungarianAlgorithm hungarian_algorithm;
+    cv_bridge::CvImagePtr cv_ptr;
+    vector<ExtKalmanFilter> ekf_list;
+    float* depths;
+    bool has_image= false;
+    bool initial_ = true;
+    cv::Mat image_color;
 
+    void cameraCallback(const sensor_msgs::ImageConstPtr &img);
+    void depthCallback(const sensor_msgs::ImageConstPtr &depth_img);
+    void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people);
+    double centroidDistance(cv::Point a, cv::Point b);
+    double iouScore(cv::Rect pred_box, cv::Rect detect_box);
 };
 
 tracker::tracker() {
@@ -72,11 +74,29 @@ tracker::tracker() {
   person_pub = handler.advertise<detection::target_person>(person_topic, 1, true);
 }
 
+double centroid_distance(cv::Point A, cv::Point b) {
+  return sqrt( pow((A.x - B.x),2) + pow((A.y - B.y),2) );
+}
+
+double iouScore(cv::Rect pred_box, cv::Rect detect_box) {
+  
+  double xmin = max(predBox.x, detectBox.x);
+  double ymin = max(predBox.y, detectBox.y);
+  double xmax = min(predBox.x + predBox.width, detectBox.x + detectBox.width);
+  double ymax = min(predBox.y + predBox.height, detectBox.y + detectBox.height);
+
+  cv::Rect intersect(xmin, ymin, xmax-xmin, ymax-ymin);
+
+  double iou = (double) intersect.area() / ( (double) predBox.area() + (double) detectBox.area() -
+                                            (double) intersect.area() );
+
+  return iou;
+}
+
 void cameraCallback(const sensor_msgs::ImageConstPtr &img) {
   cv_ptr = cv_bridge::toCvCopy(img, enc::BGR8);
 
   image_color = cv_ptr->image; //current frame
-  cvtColor(image_color, image_hsv, COLOR_BGR2HSV);
   has_image = true;
 }
 
@@ -85,12 +105,12 @@ void depthCallback(const sensor_msgs::ImageConstPtr &depth_img) {
   target_person.y = ;
   target_person.image_width = ;
   target_person.x_vel = 
-  target_person.y_vel = 
-  
-  depths = (float*)(&depth_img->data[0]);
+    target_person.y_vel = 
+
+    depths = (float*)(&depth_img->data[0]);
   int center_idx = target_person.x + (image_color.cols * target_person.y); // Zed Depth 
   target_person.depth = depths[center_idx];
-  
+
   pub.publish(target_person);
 }
 
@@ -124,9 +144,14 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
       iou_matrix[i] = vector<double>(box_list.size());
 
       for (int j = 0; j < box_list.size(); j++) {
-        /**
-         * calculations for distance and iou score
-         */
+
+        cv::Point box_centroid = cv::Point( (box_list[j].xmax + box_list[j].xmin)/2 ,                                                           (box_list[j].ymax + box_list[j].ymin)/2 );
+        cv::Point ekf_centroid = ekf_list[i].get_centroid();
+        distance_matrix[i][j] = centroid_distance(box_centroid, ekf_centroid);
+
+        cv::Rect pred_box = ekf_list[i].getBox();
+        cv::Rect detect_box = cv::Rect( cv::Point(r_box.xmin, r_box.ymin),                                                                  cv::Point(r_box.xmax, r_box.ymax) );
+        iou_matrix[i][j] = iouScore(pred_box, detect_box);
       }
     }
 
@@ -138,7 +163,6 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 int main(int argc, char** argv) {
   ros::init(argc, argv, "Tracking");
   tracker people_tracker;
-
 
   ros::spin();
 }

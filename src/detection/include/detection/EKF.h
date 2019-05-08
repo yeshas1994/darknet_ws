@@ -1,4 +1,9 @@
 #include <Eigen/Dense>
+#include "opencv2/video/tracking.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "darknet_ros_msgs/BoundingBoxes.h"
+#include "darknet_ros_msgs/BoundingBox.h"
 
 class ExtKalmanFilter {
 
@@ -20,6 +25,15 @@ public:
 
   //measurement covariance matrix
   Eigen::MatrixXd R_;
+  
+  //predicted bounding_box
+  cv::Rect predicted_box;
+  
+  //detected bounding_box
+  cv::Rect detected_box;
+
+  //missing count
+  int missing_count;
 
   ExtKalmanFilter();
 
