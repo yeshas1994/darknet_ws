@@ -11,13 +11,13 @@ EKF::ExtKalmanFilter() {}
 void EKF::Init(VectorXd &x_in, MatrixXd &P_in, MatrixXd &F_in,
              MatrixXd &Q_in, MatrixXd &H_in, MatrixXd &R_in) {
 
-  x_ = x_in; 
-  P_ = P_in;
-  F_ = F_in;
-  Q_ = Q_in;
-  H_ = H_in;
-  R_ = R_in;
-
+  x_ = x_in; // state vector 
+  P_ = P_in; // state covariance matrix
+  F_ = F_in; // state transition
+  Q_ = Q_in; // process covariance
+  H_ = H_in; // measurement matrix
+  R_ = R_in; // measurement covariance
+  missing_count = 0;
 }
 
 void EKF::Predict(double dT) {
@@ -42,5 +42,24 @@ void EKF::Update(const VectorXd &z) {
   long mat_size = x_.size();
   MatrixXd I = MatrixXd::Identity(x_size, x_size);
   P_ = ( I_ - (K * H) ) * P_;
+
+}
+
+void EKF::noDetection() {
+
+  missing_count++;
+
+} 
+
+cv::Point getCentroid() {
+
+  return cv::Point(x(0), x(1));
+
+}
+
+cv::Rect getBox() {
+
+  return cv::Rect( (x(0) - x(4) / 2), (x(1) - x(5) / 2),
+                   (x(0) + x(4) / 2), (x(1) + x(5) / 2) );
 
 }

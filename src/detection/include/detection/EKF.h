@@ -54,5 +54,7 @@ public:
   // Extended Kalman Filter
   // z - measurement vector
   void UpdateEKF(const Eigen::VectorXd &z);
-
+  
+  // no detection
+  void noDetection();
 };
