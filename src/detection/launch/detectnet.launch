@@ -1,0 +1,17 @@
+<launch>
+  
+  <arg name="camera_topic" value="/zed/rgb/image_rect_color"/>
+
+  <node pkg="ros_deep_learning" type="detectnet" name="detectnet" output="screen">
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="model_name" type="string" value="pednet"/>
+  </node>
+  
+  <node pkg="detection" type="detectnet_publisher" name="detectbet-publisher" output="screen">
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="detection_topic" type="string" value="/detectnet/detections"/>
+  </node>
+
+
+</launch>
+
