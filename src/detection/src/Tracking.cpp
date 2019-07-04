@@ -28,7 +28,6 @@ class tracker {
     tracker();
 
   private:
-    double max_invis_count;
 
     ros::Subscriber camera_sub;
     ros::Subscriber depth_sub;
@@ -46,9 +45,10 @@ class tracker {
     bool initial_ = true;
     cv::Mat image_color;
     double ticks;
+    int MAX_MISSING_COUNT;
 
     VectorXd x_in = VectorXd(6); // state vector
-    VectorXd z_in = VectorXd(4);
+    VectorXd z_in = VectorXd(4); // measurement vector
     MatrixXd P_in = MatrixXd(6, 6); // state covariance matrix
     P_in << 1, 0, 0,    0,    0, 0,
             0, 1, 0,    0,    0, 0,
@@ -97,16 +97,19 @@ tracker::tracker() {
   ros::NodeHandle private_handler;
 
   string camera_topic;
-  ROS_ASSERT(private_handler.getParam("camera_topic", camera_topic));
   string depth_camera_topic;
-  ROS_ASSERT(private_handler.getParam("depth_camera_topic", depth_camera_topic));
   string darknet_topic;
-  private_handler.param("darknet_topic", darknet_topic, "/darknet/bounding_boxes");
   string person_topic;
-  ROS_ASSERT(private_handler.getParam("person_topic", person_topic));
+  
+  private_handler.getParam("camera_topic", camera_topic);
+  private_handler.getParam("depth_camera_topic", depth_camera_topic);
+  private_handler.getParam("darknet_topic", darknet_topic);
+  private_handler.getParam("person_topic", person_topic);
+  private_handler.getParam("MAX_MISSING_COUNT", MAX_MISSING_COUNT);
 
   camera_sub = handler.subscribe(camera_topic, 1, &tracker::cameraCallback, this);
   darknet_sub = handler.subscribe(darknet_topic, 1, &tracker::track, this);
+  // depth calculation may differ from camera to camera, i.e the formula 
   depth_sub = handler.subscribe(depth_camera_topic, 1, &tracker::depthCallback, this);
 
   person_pub = handler.advertise<detection::target_person>(person_topic, 1, true);
@@ -197,12 +200,14 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
     for (const darknet_ros_msgs::BoundingBoxes &bounding_box : people->bounding_boxes) {
       box_list.push_back(bounding_box);
     }
-
+    
+    // Prediction Step
     for (int i = 0; i < ekf_list.size(); i++) {
-      /* PREDICT need to update Q matrix with adjusted dTs*/
+      
       ekf_list[i].F_(0,2) = dT;
       ekf_list[i].F_(1,3) = dT;
       
+      // Update process covariance matrix
       ekf_list[i].Q_ = // bla bla
 
       ekf_list[i].predict(dT) 
@@ -214,27 +219,31 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 
       for (int j = 0; j < box_list.size(); j++) {
         // Distance Matrix calculations
-        cv::Point box_centroid = cv::Point( (box_list[j].xmax + box_list[j].xmin)/2 ,                                                           (box_list[j].ymax + box_list[j].ymin)/2 );
-        cv::Point ekf_centroid = ekf_list[i].getCentroid();
+        cv::Point box_centroid = cv::Point( (box_list[j].xmax + box_list[j].xmin)/2 , (box_list[j].ymax + box_list[j].ymin)/2 );
+        cv::Point ekf_centroid = ekf_list[i].getCentroid(); // get predicted position
         distance_matrix[i][j] = centroid_distance(box_centroid, ekf_centroid);
 
         // Iou Matrix calculations
         cv::Rect pred_box = ekf_list[i].getBox();
-        cv::Rect detect_box = cv::Rect( cv::Point(r_box.xmin, r_box.ymin),                                                                  cv::Point(r_box.xmax, r_box.ymax) );
+        cv::Rect detect_box = cv::Rect( cv::Point(r_box.xmin, r_box.ymin), cv::Point(r_box.xmax, r_box.ymax) );
         iou_matrix[i][j] = iouScore(pred_box, detect_box);
       }
     }
-
+    
+    //Hungarian Algorithm for data association
     double cost = hungarian_algorithm.Solve(distance_matrix, assignment_list);
 
     for (int i = 0; i < ekf_list.size(); i++) {
+      // avoid all non-assigned objects
       if (assignment_list[i] >= 0) {
-
+        // check that minimum IoU criterion is fulfilled
         if (iou_matrix[i][assignment_list[i]] > 0.5) {
+          // assign the measurement vector & update the states
           z_in = getMeasurementVector(box_list[assignment_list[i]]);
           ekf_list[i].update(z_in);
 
           if (!box_list.empty()) {
+            // erase the new assigned detection from the list
             box_list.erase(box_list.begin() + assignment_list[i]);
           }
 
@@ -243,10 +252,14 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
     }
 
     for (int i = 0; i < ekf_list.size(); i++) {
-      if (ekf_list[i].missing_count > 10)
+      // missing count to stop tracking the object
+      // this value can be expoerimented with 
+      if (ekf_list[i].missing_count > MAX_MISSING_COUNT)
         ekf_list.erase(ekf_list.begin() + i);
     }
 
+
+    // add new object if it is untracked
     for (int i = 0; i < box_list.size(); i++) {
       ExtKalmanFilter ekf;
       x_in << (bounding_box.xmax + bounding_box.xmin) / 2,
@@ -259,8 +272,13 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
       ekf.init(x_in, P_in, F_in, Q_in, H_in, R_in);
       ekf_list.push_back(ekf);
     }
-
+  
   }
+
+  /* TO-DO 
+   * display detections and tracks with the help of opencv
+   */
+
 }
 
 int main(int argc, char** argv) {

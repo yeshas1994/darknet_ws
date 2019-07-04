@@ -17,6 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   message_generation
+  vision_msgs
+  geometry_msgs
   darknet_ros REQUIRED
 )
 
@@ -40,6 +42,8 @@ catkin_package(
     roscpp 
     sensor_msgs 
     std_msgs
+    vision_msgs
+    geometry_msgs
   LIBRARIES detect_lib
 )
 
@@ -54,25 +58,6 @@ add_library(detect_lib
   src/Hungarian.cpp)
 target_link_libraries(detect_lib ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS}) 
 
-add_executable(tutorial src/images_tutorial1.cpp)
-target_link_libraries(tutorial ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-
-add_executable(depth src/depth_calc.cpp)
-target_link_libraries(depth ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(depth detection_generate_messages_cpp)
-
-add_executable(humanDetection src/human_detection.cpp)
-target_link_libraries(humanDetection ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(humanDetection detection_generate_messages_cpp)
-
-add_executable(yolo_kalman src/yolo_kalman.cpp)
-target_link_libraries(yolo_kalman ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
-add_dependencies(yolo_kalman detection_generate_messages_cpp)
-
-add_executable(yolo_final src/yolo_ekf.cpp)
-target_link_libraries(yolo_final ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
-add_dependencies(yolo_final detection_generate_messages_cpp)
-
 add_executable(yolo_TKal 
   src/yolo_ekf2.cpp 
   src/TKalmanFilter.cpp 
@@ -82,20 +67,12 @@ add_executable(yolo_TKal
 target_link_libraries(yolo_TKal ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS} detect_lib)
 add_dependencies(yolo_TKal detection_generate_messages_cpp)
 
-instalL(TARGETS detect_lib
+add_executable(detectnet_publisher src/detectnet_publisher)
+target_link_libraries(detectnet_publisher ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS}) 
+
+install(TARGETS detect_lib
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION} 
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
 
-#add_executable(yolo_iou 
-#  src/yolo_ekf3.cpp 
-#  src/TKalmanFilter.cpp 
-#  src/tracks.cpp
-#  include/detection/TKalmanFilter.h
-#)
-#target_link_libraries(yolo_iou ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-#add_dependencies(yolo_iou detection_generate_messages_cpp)
-
-add_executable(yolo src/yolo_human_detection.cpp)
-target_link_libraries(yolo ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenCV_LIBS})
-add_dependencies(yolo detection_generate_messages_cpp)
