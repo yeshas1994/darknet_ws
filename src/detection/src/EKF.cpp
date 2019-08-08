@@ -36,12 +36,12 @@ void EKF::Update(const VectorXd &z) {
   MatrixXd Ht = H_.transpose();
   MatrixXd S = H_ * (P_ * Ht) + R_;
   MatrixXd Si = S.inverse();
-  MatrixXd K = PHt * Si;
+  MatrixXd K = P_ * Ht * Si; //kalman gain
 
   x_ = x_ + (K * y);
   long mat_size = x_.size();
-  MatrixXd I = MatrixXd::Identity(x_size, x_size);
-  P_ = ( I_ - (K * H) ) * P_;
+  MatrixXd I_ = MatrixXd::Identity(x_size, x_size);
+  P_ = ( I_ - (K * H_) ) * P_;
 
 }
 
@@ -53,13 +53,13 @@ void EKF::noDetection() {
 
 cv::Point getCentroid() {
 
-  return cv::Point(x(0), x(1));
+  return cv::Point(x_(0), x_(1));
 
 }
 
 cv::Rect getBox() {
 
-  return cv::Rect( (x(0) - x(4) / 2), (x(1) - x(5) / 2),
-                   (x(0) + x(4) / 2), (x(1) + x(5) / 2) );
+  return cv::Rect( (x_(0) - x_(4) / 2), (x_(1) - x_(5) / 2),
+                   (x_(0) + x_(4) / 2), (x_(1) + x_(5) / 2) );
 
 }
