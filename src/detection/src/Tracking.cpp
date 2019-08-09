@@ -57,7 +57,7 @@ class tracker {
             0, 0, 0,    0,    1, 0,
             0, 0, 0,    0,    0, 1;
 
-    MatrixXd F_in = MatrixXd(6, 6); // state transition matrix
+    MatrixXd F_in = MatrixXd(6, 6); // state transition matrix F_in[0,2] and F_in[1,3] are dT
     F_in << 1, 0, 1, 0, 0, 0,
             0, 1, 0, 1, 0, 0,
             0, 0, 1, 0, 0, 0,
@@ -71,9 +71,11 @@ class tracker {
             0, 0, 0, 0, 1, 0,
             0, 0, 0, 0, 0, 1;
     
-    MatrixXd R_in = MatrixXd(4, 4); // measurement covariance matrix
-    R_in << 0.01, 0,
-            0,    0.01;
+    MatrixXd R_in = MatrixXd(4, 6); // measurement covariance matrix
+    R_in << 0.01, 0,    1,    1,    0, 0,
+            0,    0.01, 1,    1,    0, 0, 
+            1,    1,    0.01, 0,    0, 0,
+            1,    1,    0,    0.01, 0, 0;
 
     MatrixXd Q_in = MatrixXd(6, 6); // process covariance matrix
     Q_in << 1, 0, 0, 0, 0, 0,
@@ -128,8 +130,7 @@ double iouScore(cv::Rect pred_box, cv::Rect detect_box) {
 
   cv::Rect intersect(xmin, ymin, xmax-xmin, ymax-ymin);
 
-  double iou = (double) intersect.area() / ( (double) predBox.area() + (double) detectBox.area() -
-                                            (double) intersect.area() );
+  double iou = (double) intersect.area() / ( (double) predBox.area() + (double) detectBox.area() - (double) intersect.area() );
 
   return iou;
 }
@@ -137,8 +138,8 @@ double iouScore(cv::Rect pred_box, cv::Rect detect_box) {
 VectorXd getMeasurementVector(const darknet_ros_msgs::BoundingBox& box) {
 
   VectorXd z = VectorXd(4);
-  z << box.xmax + box.xmin / 2,
-       box.ymax + box.ymin / 2,
+  z << (box.xmax + box.xmin) / 2,
+       (box.ymax + box.ymin) / 2,
        box.width,
        box.height;
 
@@ -183,7 +184,6 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
 
   if (initial_ && has_image) {
     for (const darknet_ros_msgs::BoundingBoxes &bounding_box : people->bounding_boxes) {
-      box_list.push_back(bounding_box);
       x_in << (bounding_box.xmax + bounding_box.xmin) / 2,
               (bounding_box.ymax + bounding_box.ymin) / 2,
               0,
@@ -191,7 +191,7 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
               (bounding_box.width),
               (bounding_box.height);
       ExtKalmanFilter ekf;
-      ekf.init(x_in, P_in, F_in, Q_in, H_in, R_in);
+      ekf.Init(x_in, P_in, F_in, Q_in, H_in, R_in);
       ekf_list.push_back(ekf);
     }
     initial_ = false;
@@ -207,8 +207,7 @@ void track(const darknet_ros_msgs::BoundingBoxes::ConstPtr &people) {
       ekf_list[i].F_(0,2) = dT;
       ekf_list[i].F_(1,3) = dT;
       
-      // Update process covariance matrix
-      ekf_list[i].Q_ = // bla bla
+      // ekf_list[i].Q_ = not required
 
       ekf_list[i].predict(dT) 
     }
