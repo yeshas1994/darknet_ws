@@ -6,3 +6,5 @@ logs/
 .*.swp
 *~
 *.pyc
+src/darknet_ros/
+src/zed-ros-wrapper/
